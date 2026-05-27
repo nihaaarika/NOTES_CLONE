@@ -2,107 +2,112 @@ import streamlit as st
 from modules.database import db
 from datetime import datetime
 
-st.markdown("# 📝 Journaling")
+st.title("📝 Journaling")
+st.markdown("---")
 
 user_id = st.session_state.current_user['id']
 
-# Google Fonts list
-FONTS = [
-    "Lora", "Playfair Display", "Crimson Text",  # Elegant
-    "Inter", "Roboto", "Poppins", "Montserrat",  # Modern
-    "Caveat", "Great Vibes", "Pacifico",  # Handwriting
-    "Abril Fatface", "Bitter", "Cormorant", "EB Garamond"
+GOOGLE_FONTS = [
+    "Lora", "Merriweather", "Playfair Display", "Didot", "Crimson Text",
+    "Courier Prime", "IBM Plex Mono", "JetBrains Mono", "Roboto Mono", "Space Mono",
+    "Open Sans", "Roboto", "Poppins", "Inter", "Work Sans",
+    "Montserrat", "Raleway", "Oswald", "Bebas Neue", "Righteous",
+    "Pacifico", "Caveat", "Dancing Script", "Great Vibes", "Satisfy",
+    "Courgette", "Allura", "Arizonia", "Salsa", "Shadows Into Light",
+    "Cookie", "Fredoka One", "Lobster Two", "Fredoka", "Nunito",
+    "Quicksand", "Comfortaa", "Varela Round", "Sora", "Kantumruy Pro",
+    "Source Serif Pro", "Source Sans Pro", "Inconsolata", "Overpass", "Ubuntu",
+    "Fira Sans", "Exo", "Questrial", "ABeeZee", "Abril Fatface",
+    "Bitter", "PT Sans", "PT Serif", "Dosis", "Mulish",
+    "Manrope", "DM Sans", "DM Serif Display", "Outfit", "Schibsted Grotesk",
+    "Noto Sans", "Noto Serif", "Barlow", "Barlow Condensed", "Barlow Semi Condensed",
+    "Rubik", "Rubik Mono One", "Karla", "Vollkorn", "Libre Baskerville",
+    "IM Fell English", "Crimson Pro", "Spectral", "Gotu", "Handlee",
+    "Indie Flower", "Permanent Marker", "Caveat Brush", "Homemade Apple", "VT323"
 ]
 
-# Background themes
 BG_THEMES = {
-    "minimal": "#f8f9fa",
-    "calm": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    "flowers": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-    "hearts": "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-    "fancy": "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-    "nature": "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+    "minimal": {"bg": "#ffffff"},
+    "calm": {"bg": "#f0f4f8"},
+    "soft pink": {"bg": "#ffe8f0"},
+    "soft blue": {"bg": "#e8f4ff"},
+    "gradient sunset": {"gradient": "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)"},
+    "gradient ocean": {"gradient": "linear-gradient(135deg, #667eea 0%, #64b5f6 100%)"},
+    "gradient forest": {"gradient": "linear-gradient(135deg, #81c784 0%, #43a047 100%)"},
+    "gradient pink": {"gradient": "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"},
 }
 
-# Two columns: left for editor, right for styling
-col1, col2 = st.columns([2, 1], gap="large")
+# Import Google Fonts CSS
+def get_fonts_css():
+    fonts_str = "%20".join(GOOGLE_FONTS)
+    return f"https://fonts.googleapis.com/css2?family={fonts_str.replace(' ', '+')}&display=swap"
+
+st.markdown(f"""
+<link href="{get_fonts_css()}" rel="stylesheet">
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns([3, 1], gap="large")
 
 with col1:
-    st.markdown("### Write your thoughts")
-    title = st.text_input("Title", placeholder="Today's thoughts...")
-    content = st.text_area("Content", height=300, placeholder="Write freely...")
+    st.markdown("### ✍️ Write Your Entry")
+    title = st.text_input("📌 Title", placeholder="Today's thoughts...")
+    content = st.text_area("", placeholder="Write freely...", height=320, key="journal_content")
 
 with col2:
-    st.markdown("### Styling Options")
-
-    # Font selection
-    font_family = st.selectbox("Font", FONTS, index=0)
-
-    # Color pickers
+    st.markdown("### 🎨 Styling")
+    font = st.selectbox("Font", GOOGLE_FONTS, index=0)
     text_color = st.color_picker("Text Color", "#1e293b")
-    bg_color = st.color_picker("Background Color", "#ffffff")
+    bg_theme = st.selectbox("Background", list(BG_THEMES.keys()))
 
-    # Background theme
-    bg_theme = st.radio("Background Theme", list(BG_THEMES.keys()))
+st.markdown("---")
 
-# Save button
-col1, col2 = st.columns([1, 1])
+col1, col2, col3 = st.columns(3)
 with col1:
-    if st.button("💾 Save Entry", use_container_width=True):
+    if st.button("💾 Save Entry", use_container_width=True, type="primary"):
         if title.strip() and content.strip():
             db.create_journal_entry(
                 user_id,
                 title,
                 content,
-                font_family=font_family,
+                font_family=font,
                 text_color=text_color,
-                bg_color=bg_color,
+                bg_color=text_color,
                 bg_theme=bg_theme
             )
-            st.success("✨ Entry saved!")
+            st.success("✅ Saved!")
             st.rerun()
         else:
-            st.error("Please add title and content")
+            st.error("Add title and content")
 
-with col2:
-    if st.button("Clear", use_container_width=True):
-        st.rerun()
-
-# Display past entries
-st.markdown("---")
-st.markdown("### 📚 Past Entries")
-
+st.markdown("### 📚 Your Entries")
 entries = db.get_journal_entries(user_id)
 
 if entries:
     for entry in entries:
-        with st.expander(f"📅 {entry['entry_date']} - {entry['title']}", expanded=False):
-            # Apply custom styling
-            st.markdown(f"""
-            <div style="
-                background-color: {entry['bg_color']};
-                padding: 1.5rem;
-                border-radius: 12px;
-                color: {entry['text_color']};
-                font-family: {entry['font_family']}, serif;
-                line-height: 1.6;
-            ">
-                <h4>{entry['title']}</h4>
-                <p>{entry['content']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        theme = BG_THEMES.get(entry['bg_theme'], {})
+        bg_style = theme.get('bg', '#ffffff') if 'bg' in theme else theme.get('gradient', '#ffffff')
 
-            # Edit and Delete buttons
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if st.button(f"✏️ Edit", key=f"edit_{entry['id']}"):
-                    st.session_state.editing_entry_id = entry['id']
-                    st.rerun()
+        if 'gradient' in theme:
+            bg_html = f"background: {bg_style};"
+        else:
+            bg_html = f"background-color: {bg_style};"
 
-            with col2:
-                if st.button(f"🗑️ Delete", key=f"delete_{entry['id']}"):
-                    db.delete_journal_entry(entry['id'])
-                    st.success("Entry deleted")
-                    st.rerun()
+        st.markdown(f"""
+        <div style="{bg_html} padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem;">
+            <h3 style="font-family: '{entry['font_family']}'; color: {entry['text_color']};  margin: 0;">
+                {entry['title']}
+            </h3>
+            <p style="font-family: '{entry['font_family']}'; color: {entry['text_color']}; line-height: 1.8; margin: 1rem 0;">
+                {entry['content'][:300]}...
+            </p>
+            <small style="color: #666;">{entry['entry_date']}</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🗑️ Delete", key=f"del_{entry['id']}", use_container_width=True):
+                db.delete_journal_entry(entry['id'])
+                st.rerun()
 else:
-    st.info("No journal entries yet. Start by writing your first entry!")
+    st.info("📝 No entries yet. Start writing!")

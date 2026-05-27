@@ -68,13 +68,29 @@ class NotesDatabase:
             )
         """)
 
-        # Manifestations (Goals) table
+        # Manifestations (Daily Goals) table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS manifestations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                goal_text TEXT NOT NULL,
-                completed INTEGER DEFAULT 0,
+                manifest_date DATE NOT NULL,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+        """)
+
+        # Billing (Expense Tracker) table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS billing (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                expense_date DATE,
+                category TEXT,
+                description TEXT,
+                amount REAL NOT NULL,
+                paid_by TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(user_id) REFERENCES users(id)
@@ -275,56 +291,69 @@ class NotesDatabase:
 
     # ========== MANIFESTATIONS OPERATIONS ==========
 
-    def create_manifestation(self, user_id: int, goal_text: str) -> int:
-        """Create a manifestation/goal"""
+    def create_manifestation(self, user_id: int, content: str, manifest_date: str = None) -> int:
+        """Create a daily manifestation entry"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
-            INSERT INTO manifestations (user_id, goal_text)
-            VALUES (?, ?)
-        """, (user_id, goal_text))
+        if manifest_date is None:
+            manifest_date = "DATE('now')"
+            cursor.execute(f"""
+                INSERT INTO manifestations (user_id, manifest_date, content)
+                VALUES (?, {manifest_date}, ?)
+            """, (user_id, content))
+        else:
+            cursor.execute("""
+                INSERT INTO manifestations (user_id, manifest_date, content)
+                VALUES (?, ?, ?)
+            """, (user_id, manifest_date, content))
 
         goal_id = cursor.lastrowid
         conn.commit()
         conn.close()
         return goal_id
 
-    def get_manifestations(self, user_id: int, completed_only: bool = False) -> List[Dict]:
-        """Get all manifestations for a user"""
+    def get_manifestations(self, user_id: int) -> List[Dict]:
+        """Get all daily manifestations for a user"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        if completed_only:
-            query = "SELECT * FROM manifestations WHERE user_id = ? AND completed = 1 ORDER BY updated_at DESC"
-        else:
-            query = "SELECT * FROM manifestations WHERE user_id = ? ORDER BY completed, updated_at DESC"
+        cursor.execute("""
+            SELECT * FROM manifestations
+            WHERE user_id = ?
+            ORDER BY manifest_date DESC
+        """, (user_id,))
 
-        cursor.execute(query, (user_id,))
         goals = [dict(row) for row in cursor.fetchall()]
         conn.close()
         return goals
 
-    def update_manifestation(self, goal_id: int, completed: int = None, goal_text: str = None):
+    def get_manifestation_by_date(self, user_id: int, date: str) -> Optional[Dict]:
+        """Get manifestation for a specific date"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM manifestations
+            WHERE user_id = ? AND manifest_date = ?
+        """, (user_id, date))
+
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def update_manifestation(self, goal_id: int, content: str = None):
         """Update a manifestation"""
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        updates = []
-        params = []
+        if content is not None:
+            cursor.execute("""
+                UPDATE manifestations
+                SET content = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (content, goal_id))
 
-        if completed is not None:
-            updates.append("completed = ?")
-            params.append(completed)
-        if goal_text is not None:
-            updates.append("goal_text = ?")
-            params.append(goal_text)
-
-        if updates:
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            query = f"UPDATE manifestations SET {', '.join(updates)} WHERE id = ?"
-            params.append(goal_id)
-            cursor.execute(query, params)
             conn.commit()
 
         conn.close()
@@ -403,6 +432,77 @@ class NotesDatabase:
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM everyday_notes WHERE id = ?", (note_id,))
+        conn.commit()
+        conn.close()
+
+    # ========== BILLING OPERATIONS ==========
+
+    def create_expense(self, user_id: int, description: str, amount: float, category: str = "Other", paid_by: str = "") -> int:
+        """Create an expense"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO billing (user_id, expense_date, description, amount, category, paid_by)
+            VALUES (?, DATE('now'), ?, ?, ?, ?)
+        """, (user_id, description, amount, category, paid_by))
+
+        expense_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return expense_id
+
+    def get_expenses(self, user_id: int) -> List[Dict]:
+        """Get all expenses for a user"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM billing
+            WHERE user_id = ?
+            ORDER BY expense_date DESC
+        """, (user_id,))
+
+        expenses = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return expenses
+
+    def update_expense(self, expense_id: int, description: str = None, amount: float = None,
+                      category: str = None, paid_by: str = None):
+        """Update an expense"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        updates = []
+        params = []
+
+        if description is not None:
+            updates.append("description = ?")
+            params.append(description)
+        if amount is not None:
+            updates.append("amount = ?")
+            params.append(amount)
+        if category is not None:
+            updates.append("category = ?")
+            params.append(category)
+        if paid_by is not None:
+            updates.append("paid_by = ?")
+            params.append(paid_by)
+
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            query = f"UPDATE billing SET {', '.join(updates)} WHERE id = ?"
+            params.append(expense_id)
+            cursor.execute(query, params)
+            conn.commit()
+
+        conn.close()
+
+    def delete_expense(self, expense_id: int):
+        """Delete an expense"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM billing WHERE id = ?", (expense_id,))
         conn.commit()
         conn.close()
 

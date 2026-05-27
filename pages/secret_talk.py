@@ -2,50 +2,63 @@ import streamlit as st
 from modules.database import db
 from datetime import datetime
 
-st.markdown("# 💬 Secret Talk")
+st.title("💬 Secret Talk")
+st.markdown("---")
+st.markdown("*Express your feelings freely - frustration, anxiety, confusion, anything.*")
 
 user_id = st.session_state.current_user['id']
 
-st.markdown("### 🎙️ Record Your Voice Thoughts")
-
-# For now: text-based "voice notes" (voice recording requires streamlit-webrtc which adds complexity)
-col1, col2 = st.columns([2, 1])
+col1, col2 = st.columns([3, 1])
 
 with col1:
-    voice_note = st.text_area(
-        "Your thoughts (as if speaking)",
-        height=200,
-        placeholder="Speak your mind freely...",
-        label_visibility="collapsed"
+    st.markdown("### What's on your mind?")
+    thought = st.text_area(
+        "",
+        height=280,
+        placeholder="Write whatever you're feeling...\n\n- Frustrated?\n- Anxious?\n- Confused?\n- Overwhelmed?\n\nLet it out here.",
+        key="secret_thought"
     )
 
 with col2:
-    st.markdown("### Recording Options")
-    record_type = st.radio("Type", ["Text-based", "Transcribe"], label_visibility="collapsed")
+    st.markdown("### Mood")
+    mood = st.selectbox(
+        "",
+        ["😔 Sad", "😤 Frustrated", "😰 Anxious", "😕 Confused", "😤 Angry", "😟 Worried", "😶 Overwhelmed", "💭 Thinking"],
+        key="mood_select"
+    )
 
-if st.button("💾 Save Voice Note", use_container_width=True):
-    if voice_note.strip():
-        db.create_voice_note(user_id, f"note_{datetime.now().isoformat()}.txt", voice_note)
-        st.success("✨ Voice note saved!")
+st.markdown("---")
+
+if st.button("💾 Save Thought", use_container_width=True, type="primary"):
+    if thought.strip():
+        db.create_voice_note(
+            user_id,
+            f"secret_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            thought
+        )
+        st.success("✅ Saved securely!")
         st.rerun()
     else:
-        st.error("Please add your thoughts")
+        st.error("Write something first")
 
-# Display past voice notes
-st.markdown("---")
-st.markdown("### 🎙️ Past Recordings")
+st.markdown("### 📖 Your Thoughts")
 
-voice_notes = db.get_voice_notes(user_id)
+notes = db.get_voice_notes(user_id)
 
-if voice_notes:
-    for note in voice_notes:
-        with st.expander(f"🎙️ {note['entry_date']}", expanded=False):
-            st.markdown(f"**{note['audio_filename']}**")
-            st.write(note['transcription'])
-
-            if st.button(f"🗑️ Delete", key=f"delete_voice_{note['id']}"):
-                db.delete_voice_note(note['id'])
-                st.success("Voice note deleted")
-                st.rerun()
+if notes:
+    for note in notes:
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"""
+                <div style="border-left: 4px solid #667eea; padding-left: 1rem; margin-bottom: 1rem;">
+                    <strong>{note['entry_date']}</strong><br>
+                    <p>{note['transcription'][:200]}...</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️", key=f"del_{note['id']}", help="Delete"):
+                    db.delete_voice_note(note['id'])
+                    st.rerun()
 else:
-    st.info("No voice notes yet. Record your first thought!")
+    st.info("💭 No thoughts saved yet.")

@@ -1,72 +1,71 @@
 import streamlit as st
 from modules.database import db
-from datetime import datetime, timedelta
+from datetime import datetime
 
-st.markdown("# 📅 Everyday Notes")
+st.title("📅 Everyday Notes")
+st.markdown("---")
 
 user_id = st.session_state.current_user['id']
 
-# Date picker
-col1, col2 = st.columns([2, 1])
+col1, col2 = st.columns([3, 1])
 
 with col1:
-    selected_date = st.date_input("Select Date", value=datetime.now())
+    selected_date = st.date_input("Select Date", value=datetime.now().date())
 
 with col2:
-    if st.button("Today", use_container_width=True):
+    if st.button("📌 Today", use_container_width=True):
+        selected_date = datetime.now().date()
         st.rerun()
 
-# Get or create note for selected date
 date_str = selected_date.strftime("%Y-%m-%d")
 existing_note = db.get_everyday_note_by_date(user_id, date_str)
 note_content = existing_note['content'] if existing_note else ""
 note_id = existing_note['id'] if existing_note else None
 
-# Text area for note
-st.markdown(f"### Notes for {selected_date.strftime('%A, %B %d, %Y')}")
+st.markdown(f"### {selected_date.strftime('%A, %B %d, %Y')}")
+
 new_content = st.text_area(
-    "Daily notes",
+    "",
     value=note_content,
-    height=300,
-    placeholder="Write your daily thoughts...",
-    label_visibility="collapsed"
+    height=280,
+    placeholder="Write your daily thoughts, mood, activities...",
+    key="daily_note"
 )
 
-# Save button
-col1, col2 = st.columns([1, 1])
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("💾 Save", use_container_width=True):
+    if st.button("💾 Save", use_container_width=True, type="primary"):
         if new_content.strip():
             if existing_note:
                 db.update_everyday_note(note_id, new_content)
-                st.success("✏️ Note updated!")
+                st.success("✅ Updated!")
             else:
                 db.create_everyday_note(user_id, new_content)
-                st.success("✨ Note saved!")
+                st.success("✅ Saved!")
             st.rerun()
         else:
-            st.error("Please add some content")
+            st.error("Write something")
 
-with col2:
-    if st.button("Clear", use_container_width=True):
-        st.rerun()
-
-# Quick access to recent notes
 st.markdown("---")
-st.markdown("### 📋 Recent Notes (Last 7 Days)")
+st.markdown("### 📚 Recent Notes")
 
 all_notes = db.get_everyday_notes(user_id)
-recent_notes = all_notes[:7]
 
-if recent_notes:
-    for note in recent_notes:
-        with st.expander(f"📅 {note['note_date']}", expanded=False):
-            st.write(note['content'][:200] + "..." if len(note['content']) > 200 else note['content'])
-
-            if st.button(f"🗑️ Delete", key=f"delete_note_{note['id']}"):
-                db.delete_everyday_note(note['id'])
-                st.success("Note deleted")
-                st.rerun()
+if all_notes:
+    for note in all_notes[:10]:
+        with st.container():
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                st.markdown(f"""
+                <div style="border-left: 4px solid #667eea; padding-left: 1rem; margin-bottom: 1rem;">
+                    <strong>📅 {note['note_date']}</strong><br>
+                    <p>{note['content'][:150]}...</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️", key=f"del_{note['id']}", help="Delete"):
+                    db.delete_everyday_note(note['id'])
+                    st.rerun()
 else:
-    st.info("No notes yet. Start writing!")
+    st.info("📝 No notes yet.")
