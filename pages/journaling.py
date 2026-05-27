@@ -2,7 +2,7 @@ import streamlit as st
 from modules.database import db
 from datetime import datetime
 
-st.title("📝 Journaling")
+st.title(" Journaling")
 st.markdown("---")
 
 user_id = st.session_state.current_user['id']
