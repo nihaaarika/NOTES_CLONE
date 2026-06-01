@@ -23,9 +23,9 @@ FONTS = [
 ]
 
 BACKGROUNDS = {
-    "White": "#ffffff", "Soft Pink": "#ffe8f0", "Sky Blue": "#e8f4ff",
-    "Warm Sand": "#fef3e2", "Misty Gray": "#f0f4f8", "Lavender": "#f0e6ff",
-    "Mint": "#e6fff4", "Peach": "#fff0e6", "Dark Navy": "#1a1a2e", "Dark Purple": "#16002e",
+    "White": "#ffffff", "Soft Pink": "#ea85a9", "Sky Blue": "#57a4ec",
+    "Warm Sand": "#edd8b8", "Misty Gray": "#d5d9de", "Lavender": "#c9a6fd",
+    "Mint": "#bcfadf", "Peach": "#efded3", "Dark Navy": "#1a1a30", "Dark Purple": "#31095c",
 }
 GRADIENTS = {
     "Sunset": "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)",
