@@ -1,11 +1,14 @@
 import streamlit as st
 from modules.database import db
-import streamlit.components.v1 as components
 
 st.title("📔 Journaling")
 st.markdown("---")
 
 user_id = st.session_state.current_user['id']
+
+# ═════════════════════════════════════════════════════════════════════════════
+# DATA
+# ═════════════════════════════════════════════════════════════════════════════
 
 FONTS = [
     "Lora", "Merriweather", "Playfair Display", "Crimson Text",
@@ -46,149 +49,138 @@ IMAGES = {
 ALL_BG_NAMES = list(BACKGROUNDS.keys()) + list(GRADIENTS.keys()) + list(IMAGES.keys())
 
 LEGACY = {
-    "minimal":"White","calm":"Misty Gray","soft pink":"Soft Pink","soft blue":"Sky Blue",
-    "gradient sunset":"Sunset","gradient ocean":"Ocean","gradient forest":"Forest",
-    "gradient pink":"Rose Gold","Dark":"Dark Navy","🌙 Dark Mode":"Dark Navy",
+    "minimal": "White", "calm": "Misty Gray", "soft pink": "Soft Pink", "soft blue": "Sky Blue",
+    "gradient sunset": "Sunset", "gradient ocean": "Ocean", "gradient forest": "Forest",
+    "gradient pink": "Rose Gold", "Dark": "Dark Navy", "🌙 Dark Mode": "Dark Navy",
 }
 
+# ═════════════════════════════════════════════════════════════════════════════
+# HELPERS
+# ═════════════════════════════════════════════════════════════════════════════
+
 def resolve(name):
-    if name in ALL_BG_NAMES: return name
+    if name in ALL_BG_NAMES:
+        return name
     return LEGACY.get(name, "White")
 
 def get_bg_style(name):
     key = resolve(name)
-    if key in BACKGROUNDS: return f"background-color:{BACKGROUNDS[key]}!important;"
-    if key in GRADIENTS:   return f"background:{GRADIENTS[key]}!important;"
-    if key in IMAGES:      return f"background-image:url('{IMAGES[key]}')!important;background-size:cover!important;background-position:center!important;"
-    return "background-color:#ffffff!important;"
+    if key in BACKGROUNDS:
+        return f"background-color:{BACKGROUNDS[key]};"
+    if key in GRADIENTS:
+        return f"background:{GRADIENTS[key]};"
+    if key in IMAGES:
+        return f"background-image:url('{IMAGES[key]}');background-size:cover;background-position:center;"
+    return "background-color:#ffffff;"
 
-# Load Google Fonts
+def get_bg_color(name):
+    """Get the actual hex color for bg_color database column"""
+    key = resolve(name)
+    if key in BACKGROUNDS:
+        return BACKGROUNDS[key]
+    return "#ffffff"
+
+def escape_html(text):
+    """Escape HTML special characters to prevent XSS and rendering issues"""
+    return (text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+# ═════════════════════════════════════════════════════════════════════════════
+# GOOGLE FONTS
+# ═════════════════════════════════════════════════════════════════════════════
+
 font_import = "&family=".join([f.replace(" ", "+") for f in FONTS])
 st.markdown(
     f'<link href="https://fonts.googleapis.com/css2?family={font_import}&display=swap" rel="stylesheet">',
     unsafe_allow_html=True
 )
 
-# Session state
-if "selected_font"    not in st.session_state: st.session_state.selected_font    = "Lora"
-if "font_picker_open" not in st.session_state: st.session_state.font_picker_open = False
+# ═════════════════════════════════════════════════════════════════════════════
+# SESSION STATE
+# ═════════════════════════════════════════════════════════════════════════════
 
-# ── WRITE SECTION ─────────────────────────────────────────────────────────────
+if "selected_font" not in st.session_state:
+    st.session_state.selected_font = "Lora"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# WRITE SECTION
+# ═════════════════════════════════════════════════════════════════════════════
+
 st.markdown("### ✍️ Write Your Entry")
 write_col, style_col = st.columns([3, 1], gap="large")
 
 with write_col:
-    title   = st.text_input("📌 Title", placeholder="Today's thoughts...", key="j_title")
-    content = st.text_area("Content", placeholder="Write freely...", height=300,
+    title = st.text_input("📌 Title", placeholder="Today's thoughts...", key="j_title")
+    content = st.text_area("Content", placeholder="Write freely...", height=250,
                            label_visibility="collapsed", key="j_content")
 
 with style_col:
     st.markdown("### 🎨 Styling")
+
+    # ── Font Selector ──────────────────────────────────────────────────────
     st.markdown("**✏️ Font**")
+    font_idx = FONTS.index(st.session_state.selected_font) if st.session_state.selected_font in FONTS else 0
+    selected_font = st.selectbox(
+        "Font", FONTS, index=font_idx,
+        label_visibility="collapsed", key="j_font"
+    )
+    st.session_state.selected_font = selected_font
 
-    cur_font = st.session_state.selected_font
-
-    # ── Dropdown trigger button ───────────────────────────────────────────────
-    st.markdown(f"""
-    <style>
-    div[data-testid="stButton"] button[kind="secondary"]#font-btn {{
-        width: 100%;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
-    btn_label = f"{cur_font}  ▼"
-    if st.button(btn_label, key="font_btn", use_container_width=True):
-        st.session_state.font_picker_open = not st.session_state.font_picker_open
-
-    # Show button styled in the selected font
-    st.markdown(f"""
-    <style>
-    /* Make font button render in the selected font */
-    div[data-testid="column"]:last-child div[data-testid="stButton"] button p {{
-        font-family: '{cur_font}', serif !important;
-        font-size: 16px !important;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ── Font dropdown (only shown when open) ─────────────────────────────────
-    if st.session_state.font_picker_open:
-        font_rows = ""
-        for f in FONTS:
-            is_sel = "selected" if f == cur_font else ""
-            font_rows += f'<div class="frow {is_sel}" data-font="{f}" style="font-family:\'{f}\',serif;">{f}</div>\n'
-
-        picker_html = f"""<!DOCTYPE html>
-<html><head>
-<link href="https://fonts.googleapis.com/css2?family={font_import}&display=swap" rel="stylesheet">
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:transparent}}
-#search{{
-    width:100%;padding:8px 12px;
-    background:#2a2a3e;border:1px solid #555;border-radius:8px;
-    color:#fff;font-size:14px;outline:none;margin-bottom:6px;
-}}
-#search::placeholder{{color:#888}}
-#list{{
-    max-height:260px;overflow-y:auto;
-    background:#1e1e2e;border:1px solid #444;border-radius:8px;padding:4px 0;
-}}
-#list::-webkit-scrollbar{{width:5px}}
-#list::-webkit-scrollbar-thumb{{background:#555;border-radius:3px}}
-.frow{{
-    padding:10px 14px;font-size:17px;color:#ddd;cursor:pointer;
-    border-left:3px solid transparent;transition:background 0.12s;
-}}
-.frow:hover{{background:#2a2a3e;color:#fff}}
-.frow.selected{{background:#2d1f54;color:#c4b5fd;border-left:3px solid #7c3aed}}
-</style></head><body>
-<input id="search" type="text" placeholder="🔍 Search fonts...">
-<div id="list">{font_rows}</div>
-<script>
-window.onload=function(){{
-    var s=document.querySelector('.frow.selected');
-    if(s) s.scrollIntoView({{block:'center'}});
-}};
-document.querySelectorAll('.frow').forEach(function(row){{
-    row.addEventListener('click',function(){{
-        document.querySelectorAll('.frow').forEach(r=>r.classList.remove('selected'));
-        this.classList.add('selected');
-        window.parent.postMessage({{type:'streamlit:setComponentValue',value:this.dataset.font}},'*');
-    }});
-}});
-document.getElementById('search').addEventListener('input',function(){{
-    var q=this.value.toLowerCase();
-    document.querySelectorAll('.frow').forEach(function(row){{
-        row.style.display=row.dataset.font.toLowerCase().includes(q)?'':'none';
-    }});
-}});
-</script></body></html>"""
-
-        picked = components.html(picker_html, height=340, scrolling=False)
-
-        # IMPORTANT: only update font, don't let this interfere with save
-        if picked is not None and isinstance(picked, str) and picked in FONTS:
-            st.session_state.selected_font = picked
-            st.session_state.font_picker_open = False
-            st.rerun()
+    # Font preview
+    st.markdown(
+        f'<p style="font-family:\'{selected_font}\',serif;font-size:18px;color:#aaa;margin-top:4px;">'
+        f'Preview: The quick brown fox</p>',
+        unsafe_allow_html=True
+    )
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Text Color ───────────────────────────────────────────────────────────
     text_color = st.color_picker("🎨 Text Color", "#1e293b", key="j_color")
 
+    # ── Background ─────────────────────────────────────────────────────────
     st.markdown("**🖼️ Background**")
-    bg_name = st.selectbox("bg", ALL_BG_NAMES, index=0, label_visibility="collapsed", key="j_bg")
+    bg_name = st.selectbox(
+        "Background", ALL_BG_NAMES, index=0,
+        label_visibility="collapsed", key="j_bg"
+    )
     st.markdown(
-        f'<div style="{get_bg_style(bg_name)} height:55px;border-radius:10px;border:2px solid #7c3aed;margin-top:6px;"></div>',
+        f'<div style="{get_bg_style(bg_name)} height:55px;border-radius:10px;'
+        f'border:2px solid #7c3aed;margin-top:6px;"></div>',
         unsafe_allow_html=True
     )
 
 font = st.session_state.selected_font
+bg_color = get_bg_color(bg_name)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LIVE PREVIEW
+# ═════════════════════════════════════════════════════════════════════════════
+
+if title.strip() or content.strip():
+    st.markdown("---")
+    st.markdown("### 👁️ Live Preview")
+    preview_style = get_bg_style(bg_name)
+
+    safe_title = escape_html(title)
+    safe_content = escape_html(content)
+
+    st.markdown(f"""
+    <div style="{preview_style} padding:1.5rem;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
+        <h2 style="font-family:'{font}',serif;color:{text_color};margin:0 0 .8rem 0;">{safe_title}</h2>
+        <p style="font-family:'{font}',serif;color:{text_color};line-height:1.8;margin:0;white-space:pre-wrap;">{safe_content}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ── SAVE — completely separate from component, uses only session_state values ─
+# ═════════════════════════════════════════════════════════════════════════════
+# SAVE
+# ═════════════════════════════════════════════════════════════════════════════
+
 if st.button("💾 Save Entry", type="primary"):
     if title.strip() and content.strip():
         try:
@@ -196,39 +188,47 @@ if st.button("💾 Save Entry", type="primary"):
                 user_id,
                 title.strip(),
                 content.strip(),
-                font_family=st.session_state.selected_font,
+                font_family=font,
                 text_color=text_color,
-                bg_color=text_color,
+                bg_color=bg_color,      # ← FIXED: was saving text_color here
                 bg_theme=bg_name
             )
             st.success("✅ Entry saved!")
+            st.session_state.j_title = ""
+            st.session_state.j_content = ""
             st.rerun()
         except Exception as e:
             st.error(f"Save failed: {e}")
     else:
         st.error("Please fill in both title and content.")
 
-# ── YOUR ENTRIES ──────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# SAVED ENTRIES
+# ═════════════════════════════════════════════════════════════════════════════
+
 st.markdown("### 📚 Your Entries")
 entries = db.get_journal_entries(user_id)
 
 if entries:
     for entry in entries:
-        f     = entry.get('font_family') or 'Lora'
-        col   = entry.get('text_color')  or '#1e293b'
+        f = entry.get('font_family') or 'Lora'
+        col = entry.get('text_color') or '#1e293b'
         style = get_bg_style(entry.get('bg_theme') or 'White')
-        uid   = f"e{entry['id']}"
-        text  = entry['content'][:300] + ('...' if len(entry['content']) > 300 else '')
+        uid = f"e{entry['id']}"
+        text = entry['content'][:300] + ('...' if len(entry['content']) > 300 else '')
+
+        safe_text = escape_html(text)
+        safe_entry_title = escape_html(entry['title'])
 
         st.markdown(f"""
         <style>.{uid}{{
-            {style.replace("!important;","").replace("!important","")}
             padding:1.6rem;border-radius:14px;
             margin-bottom:1rem;box-shadow:0 2px 12px rgba(0,0,0,0.2);
+            {style}
         }}</style>
         <div class="{uid}">
-            <h3 style="font-family:'{f}',serif;color:{col};margin:0 0 .5rem 0;">{entry['title']}</h3>
-            <p  style="font-family:'{f}',serif;color:{col};line-height:1.8;margin:0 0 .8rem 0;">{text}</p>
+            <h3 style="font-family:'{f}',serif;color:{col};margin:0 0 .5rem 0;">{safe_entry_title}</h3>
+            <p style="font-family:'{f}',serif;color:{col};line-height:1.8;margin:0 0 .8rem 0;white-space:pre-wrap;">{safe_text}</p>
             <small style="color:{col};opacity:.7;">📅 {entry['entry_date']}</small>
         </div>
         """, unsafe_allow_html=True)
