@@ -41,7 +41,7 @@ GRADIENTS = {
     "Candy": "linear-gradient(135deg, #f6d365 0%, #fda085 100%)",
 }
 IMAGES = {
-    "Watercolor Blue":  "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=1200&q=80",
+    "SunFlower": "download (1).jpeg",
     "Watercolor Peach": "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&q=80",
     "Nature Green":     "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=1200&q=80",
     "Pink Clouds":      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80",
@@ -92,7 +92,7 @@ def escape_html(text):
 # GOOGLE FONTS
 # ═════════════════════════════════════════════════════════════════════════════
 
-font_import = "&family=".join([f.replace(" ", "+") for f in FONTS])
+font_import = "&family=".join([f.replace(" ", "+", )for f in FONTS])
 st.markdown(
     f'<link href="https://fonts.googleapis.com/css2?family={font_import}&display=swap" rel="stylesheet">',
     unsafe_allow_html=True
