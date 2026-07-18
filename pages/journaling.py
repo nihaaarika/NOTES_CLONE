@@ -1,5 +1,7 @@
-import streamlit as st
+code = '''import streamlit as st
 from modules.database import db
+import os
+from pathlib import Path
 
 st.title("📔 Journaling")
 st.markdown("---")
@@ -40,13 +42,29 @@ GRADIENTS = {
     "Aurora": "linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)",
     "Candy": "linear-gradient(135deg, #f6d365 0%, #fda085 100%)",
 }
-IMAGES = {
-    "SunFlower": "download (1).jpeg",
-    "Watercolor Peach": "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&q=80",
-    "Nature Green":     "https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?w=1200&q=80",
-    "Pink Clouds":      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80",
-}
-ALL_BG_NAMES = list(BACKGROUNDS.keys()) + list(GRADIENTS.keys()) + list(IMAGES.keys())
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LOCAL IMAGES — Put your images in an "images" folder next to app.py
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Create images folder if it doesn't exist
+IMAGES_DIR = Path("images")
+IMAGES_DIR.mkdir(exist_ok=True)
+
+# Scan the images folder for your uploaded images
+LOCAL_IMAGES = {}
+if IMAGES_DIR.exists():
+    for img_file in IMAGES_DIR.iterdir():
+        if img_file.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
+            # Use the filename (without extension) as the display name
+            name = img_file.stem
+            LOCAL_IMAGES[name] = str(img_file)
+
+# Fallback: if no images found, show a message
+if not LOCAL_IMAGES:
+    st.warning("⚠️ No images found in `images/` folder. Please add your background images there.")
+
+ALL_BG_NAMES = list(BACKGROUNDS.keys()) + list(GRADIENTS.keys()) + list(LOCAL_IMAGES.keys())
 
 LEGACY = {
     "minimal": "White", "calm": "Misty Gray", "soft pink": "Soft Pink", "soft blue": "Sky Blue",
@@ -69,19 +87,19 @@ def get_bg_style(name):
         return f"background-color:{BACKGROUNDS[key]};"
     if key in GRADIENTS:
         return f"background:{GRADIENTS[key]};"
-    if key in IMAGES:
-        return f"background-image:url('{IMAGES[key]}');background-size:cover;background-position:center;"
+    if key in LOCAL_IMAGES:
+        # Use base64 for local images so they work in CSS
+        img_path = LOCAL_IMAGES[key]
+        return f"background-image:url('{img_path}');background-size:cover;background-position:center;"
     return "background-color:#ffffff;"
 
 def get_bg_color(name):
-    """Get the actual hex color for bg_color database column"""
     key = resolve(name)
     if key in BACKGROUNDS:
         return BACKGROUNDS[key]
     return "#ffffff"
 
 def escape_html(text):
-    """Escape HTML special characters to prevent XSS and rendering issues"""
     return (text
             .replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -92,7 +110,7 @@ def escape_html(text):
 # GOOGLE FONTS
 # ═════════════════════════════════════════════════════════════════════════════
 
-font_import = "&family=".join([f.replace(" ", "+", )for f in FONTS])
+font_import = "&family=".join([f.replace(" ", "+") for f in FONTS])
 st.markdown(
     f'<link href="https://fonts.googleapis.com/css2?family={font_import}&display=swap" rel="stylesheet">',
     unsafe_allow_html=True
@@ -113,14 +131,14 @@ st.markdown("### ✍️ Write Your Entry")
 write_col, style_col = st.columns([3, 1], gap="large")
 
 with write_col:
-    title = st.text_input("📌 Title", placeholder="Today's thoughts...", key="j_title")
+    title = st.text_input("📌 Title", placeholder="Today\'s thoughts...", key="j_title")
     content = st.text_area("Content", placeholder="Write freely...", height=250,
                            label_visibility="collapsed", key="j_content")
 
 with style_col:
     st.markdown("### 🎨 Styling")
 
-    # ── Font Selector ──────────────────────────────────────────────────────
+    # Font Selector
     st.markdown("**✏️ Font**")
     font_idx = FONTS.index(st.session_state.selected_font) if st.session_state.selected_font in FONTS else 0
     selected_font = st.selectbox(
@@ -129,29 +147,33 @@ with style_col:
     )
     st.session_state.selected_font = selected_font
 
-    # Font preview
     st.markdown(
-        f'<p style="font-family:\'{selected_font}\',serif;font-size:18px;color:#aaa;margin-top:4px;">'
+        f'<p style="font-family:\\'{selected_font}\\',serif;font-size:18px;color:#aaa;margin-top:4px;">'
         f'Preview: The quick brown fox</p>',
         unsafe_allow_html=True
     )
 
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style=\'height:8px\'></div>", unsafe_allow_html=True)
 
-    # ── Text Color ───────────────────────────────────────────────────────────
+    # Text Color
     text_color = st.color_picker("🎨 Text Color", "#1e293b", key="j_color")
 
-    # ── Background ─────────────────────────────────────────────────────────
+    # Background
     st.markdown("**🖼️ Background**")
     bg_name = st.selectbox(
         "Background", ALL_BG_NAMES, index=0,
         label_visibility="collapsed", key="j_bg"
     )
-    st.markdown(
-        f'<div style="{get_bg_style(bg_name)} height:55px;border-radius:10px;'
-        f'border:2px solid #7c3aed;margin-top:6px;"></div>',
-        unsafe_allow_html=True
-    )
+
+    # Show preview of selected background
+    if bg_name in LOCAL_IMAGES:
+        st.image(LOCAL_IMAGES[bg_name], use_container_width=True)
+    else:
+        st.markdown(
+            f'<div style="{get_bg_style(bg_name)} height:55px;border-radius:10px;'
+            f'border:2px solid #7c3aed;margin-top:6px;"></div>',
+            unsafe_allow_html=True
+        )
 
 font = st.session_state.selected_font
 bg_color = get_bg_color(bg_name)
@@ -163,17 +185,31 @@ bg_color = get_bg_color(bg_name)
 if title.strip() or content.strip():
     st.markdown("---")
     st.markdown("### 👁️ Live Preview")
-    preview_style = get_bg_style(bg_name)
 
     safe_title = escape_html(title)
     safe_content = escape_html(content)
 
-    st.markdown(f"""
-    <div style="{preview_style} padding:1.5rem;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
-        <h2 style="font-family:'{font}',serif;color:{text_color};margin:0 0 .8rem 0;">{safe_title}</h2>
-        <p style="font-family:'{font}',serif;color:{text_color};line-height:1.8;margin:0;white-space:pre-wrap;">{safe_content}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # For local images, use st.image instead of CSS background
+    if bg_name in LOCAL_IMAGES:
+        # Use columns to overlay text on image
+        preview_container = st.container()
+        with preview_container:
+            st.image(LOCAL_IMAGES[bg_name], use_container_width=True)
+            # Overlay text using HTML on top
+            st.markdown(f"""
+            <div style="position:relative; margin-top:-200px; padding:1.5rem; z-index:10;">
+                <h2 style="font-family:\'{font}\',serif;color:{text_color};margin:0 0 .8rem 0;text-shadow:0 1px 3px rgba(0,0,0,0.3);">{safe_title}</h2>
+                <p style="font-family:\'{font}\',serif;color:{text_color};line-height:1.8;margin:0;white-space:pre-wrap;text-shadow:0 1px 3px rgba(0,0,0,0.3);">{safe_content}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        preview_style = get_bg_style(bg_name)
+        st.markdown(f"""
+        <div style="{preview_style} padding:1.5rem;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.15);">
+            <h2 style="font-family:\'{font}\',serif;color:{text_color};margin:0 0 .8rem 0;">{safe_title}</h2>
+            <p style="font-family:\'{font}\',serif;color:{text_color};line-height:1.8;margin:0;white-space:pre-wrap;">{safe_content}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -190,7 +226,7 @@ if st.button("💾 Save Entry", type="primary"):
                 content.strip(),
                 font_family=font,
                 text_color=text_color,
-                bg_color=bg_color,      # ← FIXED: was saving text_color here
+                bg_color=bg_color,
                 bg_theme=bg_name
             )
             st.success("✅ Entry saved!")
@@ -211,14 +247,14 @@ entries = db.get_journal_entries(user_id)
 
 if entries:
     for entry in entries:
-        f = entry.get('font_family') or 'Lora'
-        col = entry.get('text_color') or '#1e293b'
-        style = get_bg_style(entry.get('bg_theme') or 'White')
-        uid = f"e{entry['id']}"
-        text = entry['content'][:300] + ('...' if len(entry['content']) > 300 else '')
+        f = entry.get(\'font_family\') or \'Lora\'
+        col = entry.get(\'text_color\') or \'#1e293b\'
+        style = get_bg_style(entry.get(\'bg_theme\') or \'White\')
+        uid = f"e{entry[\'id\']}"
+        text = entry[\'content\'][:300] + (\'...\' if len(entry[\'content\']) > 300 else \'\')
 
         safe_text = escape_html(text)
-        safe_entry_title = escape_html(entry['title'])
+        safe_entry_title = escape_html(entry[\'title\'])
 
         st.markdown(f"""
         <style>.{uid}{{
@@ -227,14 +263,21 @@ if entries:
             {style}
         }}</style>
         <div class="{uid}">
-            <h3 style="font-family:'{f}',serif;color:{col};margin:0 0 .5rem 0;">{safe_entry_title}</h3>
-            <p style="font-family:'{f}',serif;color:{col};line-height:1.8;margin:0 0 .8rem 0;white-space:pre-wrap;">{safe_text}</p>
-            <small style="color:{col};opacity:.7;">📅 {entry['entry_date']}</small>
+            <h3 style="font-family:\'{f}\',serif;color:{col};margin:0 0 .5rem 0;">{safe_entry_title}</h3>
+            <p style="font-family:\'{f}\',serif;color:{col};line-height:1.8;margin:0 0 .8rem 0;white-space:pre-wrap;">{safe_text}</p>
+            <small style="color:{col};opacity:.7;">📅 {entry[\'entry_date\']}</small>
         </div>
         """, unsafe_allow_html=True)
 
-        if st.button("🗑️ Delete", key=f"del_{entry['id']}"):
-            db.delete_journal_entry(entry['id'])
+        if st.button("🗑️ Delete", key=f"del_{entry[\'id\']}"):
+            db.delete_journal_entry(entry[\'id\'])
             st.rerun()
 else:
     st.info("📝 No entries yet. Start writing above!")
+'''
+
+with open('/mnt/agents/output/journaling.py', 'w') as f:
+    f.write(code)
+
+print("File saved successfully!")
+print(f"\nFile size: {len(code)} characters")
